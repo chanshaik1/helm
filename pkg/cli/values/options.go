@@ -34,6 +34,8 @@ type Options struct {
 	StringValues []string
 	Values       []string
 	FileValues   []string
+	// Labels customized release secret/configmap labels
+	Labels []string
 }
 
 // MergeValues merges values from files specified via -f/--values and directly
@@ -124,4 +126,19 @@ func readFile(filePath string, p getter.Providers) ([]byte, error) {
 		return nil, err
 	}
 	return data.Bytes(), err
+}
+
+func (opts *Options) ParseLabels() (map[string]string, error) {
+	base := map[string]interface{}{}
+	for _, l := range opts.Labels {
+		if err := strvals.ParseIntoString(l, base); err != nil {
+			return nil, errors.Wrap(err, "failed parsing --set-label data")
+		}
+	}
+
+	r := make(map[string]string)
+	for k, v := range base {
+		r[k] = v.(string)
+	}
+	return r, nil
 }
