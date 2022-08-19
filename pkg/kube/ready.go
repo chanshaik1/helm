@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 
 	deploymentutil "helm.sh/helm/v3/internal/third_party/k8s.io/kubernetes/deployment/util"
 )
@@ -155,7 +154,7 @@ func (c *ReadyChecker) IsReady(ctx context.Context, v *resource.Info) (bool, err
 			return false, err
 		}
 		crd := &apiextv1beta1.CustomResourceDefinition{}
-		if err := scheme.Scheme.Convert(v.Object, crd, nil); err != nil {
+		if err := NativeScheme().Convert(v.Object, crd, nil); err != nil {
 			return false, err
 		}
 		if !c.crdBetaReady(*crd) {
@@ -166,7 +165,7 @@ func (c *ReadyChecker) IsReady(ctx context.Context, v *resource.Info) (bool, err
 			return false, err
 		}
 		crd := &apiextv1.CustomResourceDefinition{}
-		if err := scheme.Scheme.Convert(v.Object, crd, nil); err != nil {
+		if err := NativeScheme().Convert(v.Object, crd, nil); err != nil {
 			return false, err
 		}
 		if !c.crdReady(*crd) {
