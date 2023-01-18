@@ -13,7 +13,7 @@ chance to try to fix the issue before it is exploited in the wild.
 
 ## Sign Your Work
 
-The sign-off is a simple line at the end of the explanation for a commit. All commits needs to be
+The sign-off is a simple line at the end of the explanation for a commit. All commits need to be
 signed. Your signature certifies that you wrote the patch or otherwise have the right to contribute
 the material. The rules are pretty simple, if you can certify the below (from
 [developercertificate.org](https://developercertificate.org/)):
@@ -104,7 +104,7 @@ specific upcoming bugfix or feature release could fall into one of two different
 
 Issues and PRs which are deemed backwards-incompatible may be added to the discussion items for
 Helm 4 with [label:v4.x](https://github.com/helm/helm/labels/v4.x). An issue or PR that we are not
-sure we will be addressing will not be added to any milestone.
+sure if we will be addressing will not be added to any milestone.
 
 A milestone (and hence release) can be closed when all outstanding issues/PRs have been closed
 or moved to another milestone and the associated release has been published.
@@ -164,8 +164,8 @@ There are 5 types of issues (each with their own corresponding [label](#labels))
   discussion, these can turn into `feature` or `bug` issues.
 - `proposal`: Used for items (like this one) that propose a new ideas or functionality that require
   a larger community discussion. This allows for feedback from others in the community before a
-  feature is actually  developed. This is not needed for small additions. Final word on whether or
-  not a feature needs a proposal is up to the core maintainers. All issues that are proposals should
+  feature is actually  developed. This is not needed for small additions. Final word on whether
+  a feature needs a proposal is up to the core maintainers. All issues that are proposals should
   both have a label and an issue title of "Proposal: [the rest of the title]." A proposal can become
   a `feature` and does not require a milestone.
 - `feature`: These track specific feature requests and ideas until they are complete. They can
@@ -183,7 +183,7 @@ below.
 2. Triage
     - The maintainer in charge of triaging will apply the proper labels for the issue. This includes
       labels for priority, type, and metadata (such as `good first issue`). The only issue priority
-      we will be tracking is whether or not the issue is "critical." If additional levels are needed
+      we will be tracking is whether the issue is "critical." If additional levels are needed
       in the future, we will add them.
     - (If needed) Clean up the title to succinctly and clearly state the issue. Also ensure that
       proposals are prefaced with "Proposal: [the rest of the title]".
@@ -195,7 +195,7 @@ below.
       See [Proposing an Idea](#proposing-an-idea). Smaller quality-of-life enhancements are exempt.
     - Issues that are labeled as `feature` or `bug` should be connected to the PR that resolves it.
     - Whoever is working on a `feature` or `bug` issue (whether a maintainer or someone from the
-      community), should either assign the issue to themself or make a comment in the issue saying
+      community), should either assign the issue to themselves or make a comment in the issue saying
       that they are taking it.
     - `proposal` and `support/question` issues should stay open until resolved or if they have not
       been active for more than 30 days. This will help keep the issue queue to a manageable size
