@@ -71,7 +71,8 @@ type Install struct {
 	ClientOnly               bool
 	Force                    bool
 	CreateNamespace          bool
-	DryRun                   bool
+	DryRun                   bool // Deprecated: replaced by DryRunMode, to be removed helm v4
+	DryRunMode               DryRunMode
 	DisableHooks             bool
 	Replace                  bool
 	Wait                     bool
@@ -179,7 +180,7 @@ func (i *Install) installCRDs(crds []chart.CRD) error {
 
 // Run executes the installation
 //
-// If DryRun is set to true, this will prepare the release, but not install it
+// If DryRunMode is not 'none', this will prepare the release, but not install it
 
 func (i *Install) Run(chrt *chart.Chart, vals map[string]interface{}) (*release.Release, error) {
 	ctx := context.Background()
@@ -207,7 +208,7 @@ func (i *Install) RunWithContext(ctx context.Context, chrt *chart.Chart, vals ma
 	// contacts the upstream server and builds the capabilities object.
 	if crds := chrt.CRDObjects(); !i.ClientOnly && !i.SkipCRDs && len(crds) > 0 {
 		// On dry run, bail here
-		if i.DryRun {
+		if i.isDryRun() {
 			i.cfg.Log("WARNING: This chart or one of its subcharts contains CRDs. Rendering may fail or contain inaccuracies.")
 		} else if err := i.installCRDs(crds); err != nil {
 			return nil, err
@@ -241,7 +242,7 @@ func (i *Install) RunWithContext(ctx context.Context, chrt *chart.Chart, vals ma
 	}
 
 	// special case for helm template --is-upgrade
-	isUpgrade := i.IsUpgrade && i.DryRun
+	isUpgrade := i.IsUpgrade && i.isDryRun()
 	options := chartutil.ReleaseOptions{
 		Name:      i.ReleaseName,
 		Namespace: i.Namespace,
@@ -257,7 +258,8 @@ func (i *Install) RunWithContext(ctx context.Context, chrt *chart.Chart, vals ma
 	rel := i.createRelease(chrt, vals)
 
 	var manifestDoc *bytes.Buffer
-	rel.Hooks, manifestDoc, rel.Info.Notes, err = i.cfg.renderResources(chrt, valuesToRender, i.ReleaseName, i.OutputDir, i.SubNotes, i.UseReleaseName, i.IncludeCRDs, i.PostRenderer, i.DryRun)
+	interactWithRemote := i.DryRunMode == DryRunModeServer
+	rel.Hooks, manifestDoc, rel.Info.Notes, err = i.cfg.renderResources(chrt, valuesToRender, i.ReleaseName, i.OutputDir, i.SubNotes, i.UseReleaseName, i.IncludeCRDs, i.PostRenderer, interactWithRemote)
 	// Even for errors, attach this if available
 	if manifestDoc != nil {
 		rel.Manifest = manifestDoc.String()
@@ -298,7 +300,7 @@ func (i *Install) RunWithContext(ctx context.Context, chrt *chart.Chart, vals ma
 	}
 
 	// Bail out here if it is a dry run
-	if i.DryRun {
+	if i.isDryRun() {
 		rel.Info.Description = "Dry run complete"
 		return rel, nil
 	}
@@ -453,21 +455,38 @@ func (i *Install) failRelease(rel *release.Release, err error) (*release.Release
 	return rel, err
 }
 
+func (i *Install) isDryRun() bool {
+	if i.DryRunMode != "" {
+		switch i.DryRunMode {
+		case DryRunModeClient, DryRunModeServer:
+			return true
+		case DryRunModeNone:
+			return false
+		default:
+			panic("Invalid DryRun mode")
+		}
+	}
+
+	// Fallback to legacy
+	return i.DryRun
+}
+
 // availableName tests whether a name is available
 //
 // Roughly, this will return an error if name is
 //
-//	- empty
-//	- too long
-//	- already in use, and not deleted
-//	- used by a deleted release, and i.Replace is false
+//   - empty
+//   - too long
+//   - already in use, and not deleted
+//   - used by a deleted release, and i.Replace is false
 func (i *Install) availableName() error {
 	start := i.ReleaseName
 
 	if err := chartutil.ValidateReleaseName(start); err != nil {
 		return errors.Wrapf(err, "release name %q", start)
 	}
-	if i.DryRun {
+
+	if i.isDryRun() {
 		return nil
 	}
 
