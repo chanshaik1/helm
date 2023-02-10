@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -31,20 +32,35 @@ import (
 
 // Options captures the different ways to specify values
 type Options struct {
-	ValueFiles   []string // -f/--values
-	StringValues []string // --set-string
-	Values       []string // --set
-	FileValues   []string // --set-file
-	JSONValues   []string // --set-json
+	ValueFiles        []string // -f/--values
+	ValuesDirectories []string // -d/--values-directory
+	StringValues      []string // --set-string
+	Values            []string // --set
+	FileValues        []string // --set-file
+	JSONValues        []string // --set-json
 }
 
-// MergeValues merges values from files specified via -f/--values and directly
-// via --set-json, --set, --set-string, or --set-file, marshaling them to YAML
+// MergeValues merges values from files specified via -f/--values, files in directories
+// specified by -d/--values-directory and directly via --set-json, --set, --set-string,
+// or --set-file, marshaling them to YAML
 func (opts *Options) MergeValues(p getter.Providers) (map[string]interface{}, error) {
 	base := map[string]interface{}{}
 
-	// User specified a values files via -f/--values
-	for _, filePath := range opts.ValueFiles {
+	// User specified values files via -f/--values
+	valuesFiles := opts.ValueFiles
+
+	// User specified values directories via -d/--values-directory
+	for _, dir := range opts.ValuesDirectories {
+		files, err := lsFiles(dir)
+		if err != nil {
+			// Error already wrapped
+			return nil, err
+		}
+
+		valuesFiles = append(valuesFiles, files...)
+	}
+
+	for _, filePath := range valuesFiles {
 		currentMap := map[string]interface{}{}
 
 		bytes, err := readFile(filePath, p)
@@ -136,4 +152,29 @@ func readFile(filePath string, p getter.Providers) ([]byte, error) {
 		return nil, err
 	}
 	return data.Bytes(), err
+}
+
+// lsFiles returns the list of names of files in input directory.
+// It ignores the sub-directories and files inside them.
+// The retuned list of filenames are in format: [<dir>/<filename>, ...]
+func lsFiles(dir string) ([]string, error) {
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to list directory %s", dir)
+	}
+
+	var filenames []string
+
+	for _, file := range files {
+		if file.IsDir() {
+			// Second and lower levels of directory are ignored
+			continue
+		}
+
+		// Relative path of file. i.e., <dir>/<filename>
+		filename := filepath.Join(dir, file.Name())
+		filenames = append(filenames, filename)
+	}
+
+	return filenames, nil
 }
