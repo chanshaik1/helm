@@ -427,7 +427,7 @@ func TestOptions_MergeValues(t *testing.T) {
 					reactVal,
 					flutterVal,
 				},
-				appNameKey: testAppFENameVal,
+				appNameKey: testAppNameVal,
 				versionKey: version1Val,
 			},
 			wantErr: false,

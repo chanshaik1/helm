@@ -48,8 +48,7 @@ type Options struct {
 func (opts *Options) MergeValues(p getter.Providers) (map[string]interface{}, error) {
 	base := map[string]interface{}{}
 
-	// User specified values files via -f/--values
-	valuesFiles := opts.ValueFiles
+	var valuesFiles []string
 
 	// User specified values directories via -d/--values-directory
 	for _, dir := range opts.ValuesDirectories {
@@ -62,6 +61,9 @@ func (opts *Options) MergeValues(p getter.Providers) (map[string]interface{}, er
 
 		valuesFiles = append(valuesFiles, files...)
 	}
+
+	// User specified values files via -f/--values
+	valuesFiles = append(valuesFiles, opts.ValueFiles...)
 
 	for _, filePath := range valuesFiles {
 		currentMap := map[string]interface{}{}
