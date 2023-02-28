@@ -30,6 +30,8 @@ import (
 	"helm.sh/helm/v3/pkg/strvals"
 )
 
+const yamlExt = `.yaml`
+
 // Options captures the different ways to specify values
 type Options struct {
 	ValueFiles        []string // -f/--values
@@ -51,7 +53,8 @@ func (opts *Options) MergeValues(p getter.Providers) (map[string]interface{}, er
 
 	// User specified values directories via -d/--values-directory
 	for _, dir := range opts.ValuesDirectories {
-		files, err := lsFiles(dir)
+		// Recursive list of YAML files in input values directory
+		files, err := recursiveListOfFiles(dir, yamlExt)
 		if err != nil {
 			// Error already wrapped
 			return nil, err
@@ -154,26 +157,38 @@ func readFile(filePath string, p getter.Providers) ([]byte, error) {
 	return data.Bytes(), err
 }
 
-// lsFiles returns the list of names of files in input directory.
-// It ignores the sub-directories and files inside them.
-// The retuned list of filenames are in format: [<dir>/<filename>, ...]
-func lsFiles(dir string) ([]string, error) {
-	files, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to list directory %s", dir)
-	}
-
+// recursiveListOfFiles returns the list of filenames in input directory
+// recursively in the format: [<dir>/<filename>, ..., <dir>/<sub-dir>/<filename> ...]
+//
+// File extension prepended with dot is required as input. Eg.: .yaml, .json, etc.
+// If input file extension is empty, all files are returned. i.e., no filtering.
+func recursiveListOfFiles(dir, ext string) ([]string, error) {
 	var filenames []string
 
-	for _, file := range files {
-		if file.IsDir() {
-			// Second and lower levels of directory are ignored
-			continue
-		}
+	err := filepath.Walk(dir,
+		func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return errors.Wrapf(err, "failed to read file %s 's info", path)
+			}
 
-		// Relative path of file. i.e., <dir>/<filename>
-		filename := filepath.Join(dir, file.Name())
-		filenames = append(filenames, filename)
+			// Filter files based on input extension
+			if ext != "" {
+				// When input file extension in not empty. i.e., list should be filtered.
+
+				if filepath.Ext(path) != ext {
+					// When file extension doesn't match input
+					return nil
+				}
+			}
+
+			// When file extension in input is empty.
+			// When file extension is not empty and file extension matches input
+			filenames = append(filenames, path)
+
+			return nil
+		})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to recursively list files in directory %s", dir)
 	}
 
 	return filenames, nil

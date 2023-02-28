@@ -200,6 +200,35 @@ func TestOptions_MergeValues(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "Values-Directories-Recursive-Read",
+			opts: Options{
+				ValueFiles: []string{},
+				ValuesDirectories: []string{
+					"testdata/multilevelvaluesd/values.d",
+				},
+				StringValues: []string{},
+				Values:       []string{},
+				FileValues:   []string{},
+				JSONValues:   []string{},
+			},
+			args: args{
+				p: []getter.Provider{},
+			},
+			want: map[string]interface{}{
+				appNameKey: testAppNameVal,
+				versionKey: version0Val,
+				backendStackKey: []interface{}{
+					goVal,
+					helmVal,
+				},
+				frontendStackKey: []interface{}{
+					reactVal,
+					flutterVal,
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "Values-Using-Set-String",
 			opts: Options{
 				ValueFiles:        []string{},
