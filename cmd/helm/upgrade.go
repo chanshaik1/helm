@@ -121,7 +121,7 @@ func newUpgradeCmd(cfg *action.Configuration, out io.Writer) *cobra.Command {
 					instClient.DependencyUpdate = client.DependencyUpdate
 					instClient.EnableDNS = client.EnableDNS
 
-					rel, err := runInstall(args, instClient, valueOpts, out)
+					rel, err := runInstall(args, instClient, cfg, valueOpts, out)
 					if err != nil {
 						return err
 					}
@@ -162,6 +162,7 @@ func newUpgradeCmd(cfg *action.Configuration, out io.Writer) *cobra.Command {
 							Keyring:          client.ChartPathOptions.Keyring,
 							SkipUpdate:       false,
 							Getters:          p,
+							RegistryClient:   cfg.RegistryClient,
 							RepositoryConfig: settings.RepositoryConfig,
 							RepositoryCache:  settings.RepositoryCache,
 							Debug:            settings.Debug,
