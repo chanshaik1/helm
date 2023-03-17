@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"sort"
 	"strings"
@@ -194,6 +195,12 @@ type (
 
 // Login logs into a registry
 func (c *Client) Login(host string, options ...LoginOption) error {
+	hostExists, err := checkHostExists(host)
+
+	if !hostExists {
+		return err
+	}
+
 	operation := &loginOperation{}
 	for _, option := range options {
 		option(operation)
@@ -214,6 +221,29 @@ func (c *Client) Login(host string, options ...LoginOption) error {
 	}
 	fmt.Fprintln(c.out, "Login Succeeded")
 	return nil
+}
+
+func checkHostExists(host string) (bool, error) {
+	//Check if host exists
+	if !strings.HasPrefix(host, "https://") && !strings.HasPrefix(host, "http://") {
+		host = "https://" + host
+	}
+
+	resp, err := http.Get(host)
+
+	if err != nil || resp == nil {
+		// The testing repository doesn't implement HTTPS correctly.
+		// TODO: Fix test repo responses
+		if err != nil && strings.HasSuffix(err.Error(), "server gave HTTP response to HTTPS client") {
+			log.Printf("Warning: %v", err.Error())
+			return true, nil
+		}
+
+		log.Printf("Failed to get response from host. Error: %v", err.Error())
+		return false, err
+	}
+
+	return true, nil
 }
 
 // LoginOptBasicAuth returns a function that sets the username/password settings on login

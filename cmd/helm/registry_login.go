@@ -21,15 +21,19 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"log"
 	"os"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/moby/term"
 	"github.com/spf13/cobra"
 
 	"helm.sh/helm/v3/cmd/helm/require"
 	"helm.sh/helm/v3/pkg/action"
+
+	xTerm "golang.org/x/term"
 )
 
 const registryLoginDesc = `
@@ -90,12 +94,29 @@ func getUsernamePassword(usernameOpt string, passwordOpt string, passwordFromStd
 	password := passwordOpt
 
 	if passwordFromStdinOpt {
-		passwordFromStdin, err := ioutil.ReadAll(os.Stdin)
+		var err error
+		var passwordFromStdin []byte
+		input := make(chan string, 1)
+		go getInput(input)
+
+		select {
+		case i := <-input:
+			password = i
+		case <-time.After(1 * time.Millisecond):
+			fmt.Println("Password not detected via stdin")
+
+			fmt.Printf("Enter registry password: ")
+			passwordFromStdin, err = xTerm.ReadPassword(int(syscall.Stdin))
+
+			fmt.Println()
+			password = string(passwordFromStdin)
+		}
+
 		if err != nil {
 			return "", "", err
 		}
-		password = strings.TrimSuffix(string(passwordFromStdin), "\n")
-		password = strings.TrimSuffix(password, "\r")
+
+		password = strings.TrimSpace(password)
 	} else if password == "" {
 		if username == "" {
 			username, err = readLine("Username: ", false)
@@ -149,4 +170,18 @@ func readLine(prompt string, silent bool) (string, error) {
 	}
 
 	return string(line), nil
+}
+
+func getInput(input chan string) {
+	r := bufio.NewReader(os.Stdin)
+	buf := make([]byte, 0, 1024)
+
+	n, err := r.Read(buf[:cap(buf)])
+	buf = buf[:n]
+
+	if n == 0 {
+		log.Fatal(err)
+	}
+
+	input <- string(buf)
 }
