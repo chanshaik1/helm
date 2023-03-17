@@ -83,6 +83,15 @@ func (cfg *Configuration) execHook(rl *release.Release, hook release.HookEvent, 
 		err = cfg.KubeClient.WatchUntilReady(resources, timeout)
 		// Note the time of success/failure
 		h.LastRun.CompletedAt = helmtime.Now()
+
+		if isTestHook(h) {
+			hookLog, err := cfg.HookLogGetter(rl, h)
+			if err != nil {
+				return err
+			}
+			h.LastRun.Log = hookLog
+		}
+
 		// Mark hook as succeeded or failed
 		if err != nil {
 			h.LastRun.Phase = release.HookPhaseFailed
@@ -144,6 +153,16 @@ func (cfg *Configuration) deleteHookByPolicy(h *release.Hook, policy release.Hoo
 func hookHasDeletePolicy(h *release.Hook, policy release.HookDeletePolicy) bool {
 	for _, v := range h.DeletePolicies {
 		if policy == v {
+			return true
+		}
+	}
+	return false
+}
+
+// isTestHook determines whether a hook is a test hook.
+func isTestHook(h *release.Hook) bool {
+	for _, e := range h.Events {
+		if e == release.HookTest {
 			return true
 		}
 	}
