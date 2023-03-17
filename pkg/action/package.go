@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"regexp"
 	"syscall"
 
 	"github.com/Masterminds/semver/v3"
@@ -58,6 +59,10 @@ func NewPackage() *Package {
 func (p *Package) Run(path string, vals map[string]interface{}) (string, error) {
 	ch, err := loader.LoadDir(path)
 	if err != nil {
+		return "", err
+	}
+
+	if err := validateName(ch.Name()); err != nil {
 		return "", err
 	}
 
@@ -102,6 +107,14 @@ func (p *Package) Run(path string, vals map[string]interface{}) (string, error) 
 	}
 
 	return name, err
+}
+
+// validateName verifies if the chart name has any illegal characters or not
+func validateName(name string) error {
+	if matched, _ := regexp.MatchString("^[[:lower:][:digit:]-]+$", name); !matched {
+		return fmt.Errorf("Invalid chart name \"%s\". Chart names must be lower case letters and numbers with optionally dashes (-) for separator\n", name)
+	}
+	return nil
 }
 
 // validateVersion Verify that version is a Version, and error out if it is not.
