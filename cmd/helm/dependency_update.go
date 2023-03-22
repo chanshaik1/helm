@@ -58,15 +58,16 @@ func newDependencyUpdateCmd(cfg *action.Configuration, out io.Writer) *cobra.Com
 				chartpath = filepath.Clean(args[0])
 			}
 			man := &downloader.Manager{
-				Out:              out,
-				ChartPath:        chartpath,
-				Keyring:          client.Keyring,
-				SkipUpdate:       client.SkipRefresh,
-				Getters:          getter.All(settings),
-				RegistryClient:   cfg.RegistryClient,
-				RepositoryConfig: settings.RepositoryConfig,
-				RepositoryCache:  settings.RepositoryCache,
-				Debug:            settings.Debug,
+				Out:                 out,
+				ChartPath:           chartpath,
+				Keyring:             client.Keyring,
+				SkipUpdate:          client.SkipRefresh,
+				Getters:             getter.All(settings),
+				RegistryClient:      cfg.RegistryClient,
+				RegistryAliasConfig: settings.RegistryAliasConfig,
+				RepositoryConfig:    settings.RepositoryConfig,
+				RepositoryCache:     settings.RepositoryCache,
+				Debug:               settings.Debug,
 			}
 			if client.Verify {
 				man.Verify = downloader.VerifyAlways

@@ -72,10 +72,11 @@ type Manager struct {
 	// SkipUpdate indicates that the repository should not be updated first.
 	SkipUpdate bool
 	// Getter collection for the operation
-	Getters          []getter.Provider
-	RegistryClient   *registry.Client
-	RepositoryConfig string
-	RepositoryCache  string
+	Getters             []getter.Provider
+	RegistryClient      *registry.Client
+	RegistryAliasConfig string
+	RepositoryConfig    string
+	RepositoryCache     string
 }
 
 // Build rebuilds a local charts directory from a lockfile.
@@ -558,14 +559,24 @@ func (m *Manager) ensureMissingRepos(repoNames map[string]string, deps []*chart.
 // resolveRepoNames returns the repo names of the referenced deps which can be used to fetch the cached index file
 // and replaces aliased repository URLs into resolved URLs in dependencies.
 func (m *Manager) resolveRepoNames(deps []*chart.Dependency) (map[string]string, error) {
+	// in an OCI only future errors from loading the repository config are not fatal
 	rf, err := loadRepoConfig(m.RepositoryConfig)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return make(map[string]string), nil
+		if os.IsNotExist(errors.Cause(err)) {
+			rf = repo.NewFile()
+		} else {
+			return nil, err
 		}
-		return nil, err
 	}
-	repos := rf.Repositories
+
+	aliases, err := registry.LoadAliasesFile(m.RegistryAliasConfig)
+	if err != nil {
+		if os.IsNotExist(errors.Cause(err)) {
+			aliases = registry.NewAliasesFile()
+		} else {
+			return nil, err
+		}
+	}
 
 	reposMap := make(map[string]string)
 
@@ -590,6 +601,8 @@ func (m *Manager) resolveRepoNames(deps []*chart.Dependency) (map[string]string,
 			continue
 		}
 
+		dd.Repository = aliases.Expand(dd.Repository)
+
 		if registry.IsOCI(dd.Repository) {
 			reposMap[dd.Name] = dd.Repository
 			continue
@@ -597,7 +610,7 @@ func (m *Manager) resolveRepoNames(deps []*chart.Dependency) (map[string]string,
 
 		found := false
 
-		for _, repo := range repos {
+		for _, repo := range rf.Repositories {
 			if (strings.HasPrefix(dd.Repository, "@") && strings.TrimPrefix(dd.Repository, "@") == repo.Name) ||
 				(strings.HasPrefix(dd.Repository, "alias:") && strings.TrimPrefix(dd.Repository, "alias:") == repo.Name) {
 				found = true

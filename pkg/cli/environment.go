@@ -73,6 +73,8 @@ type EnvSettings struct {
 	Debug bool
 	// RegistryConfig is the path to the registry config file.
 	RegistryConfig string
+	// RegistryAliasConfig is the path to the registry alias config file.
+	RegistryAliasConfig string
 	// RepositoryConfig is the path to the repositories file.
 	RepositoryConfig string
 	// RepositoryCache is the path to the repository cache directory.
@@ -99,6 +101,7 @@ func New() *EnvSettings {
 		KubeInsecureSkipTLSVerify: envBoolOr("HELM_KUBEINSECURE_SKIP_TLS_VERIFY", false),
 		PluginsDirectory:          envOr("HELM_PLUGINS", helmpath.DataPath("plugins")),
 		RegistryConfig:            envOr("HELM_REGISTRY_CONFIG", helmpath.ConfigPath("registry/config.json")),
+		RegistryAliasConfig:       envOr("HELM_REGISTRY_ALIAS_CONFIG", helmpath.ConfigPath("registry/aliases.yaml")),
 		RepositoryConfig:          envOr("HELM_REPOSITORY_CONFIG", helmpath.ConfigPath("repositories.yaml")),
 		RepositoryCache:           envOr("HELM_REPOSITORY_CACHE", helmpath.CachePath("repository")),
 		BurstLimit:                envIntOr("HELM_BURST_LIMIT", defaultBurstLimit),
@@ -143,6 +146,7 @@ func (s *EnvSettings) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.KubeInsecureSkipTLSVerify, "kube-insecure-skip-tls-verify", s.KubeInsecureSkipTLSVerify, "if true, the Kubernetes API server's certificate will not be checked for validity. This will make your HTTPS connections insecure")
 	fs.BoolVar(&s.Debug, "debug", s.Debug, "enable verbose output")
 	fs.StringVar(&s.RegistryConfig, "registry-config", s.RegistryConfig, "path to the registry config file")
+	fs.StringVar(&s.RegistryAliasConfig, "registry-alias-config", s.RegistryAliasConfig, "path to the registry alias config file")
 	fs.StringVar(&s.RepositoryConfig, "repository-config", s.RepositoryConfig, "path to the file containing repository names and URLs")
 	fs.StringVar(&s.RepositoryCache, "repository-cache", s.RepositoryCache, "path to the file containing cached repository indexes")
 	fs.IntVar(&s.BurstLimit, "burst-limit", s.BurstLimit, "client-side default throttling limit")
@@ -189,18 +193,19 @@ func envCSV(name string) (ls []string) {
 
 func (s *EnvSettings) EnvVars() map[string]string {
 	envvars := map[string]string{
-		"HELM_BIN":               os.Args[0],
-		"HELM_CACHE_HOME":        helmpath.CachePath(""),
-		"HELM_CONFIG_HOME":       helmpath.ConfigPath(""),
-		"HELM_DATA_HOME":         helmpath.DataPath(""),
-		"HELM_DEBUG":             fmt.Sprint(s.Debug),
-		"HELM_PLUGINS":           s.PluginsDirectory,
-		"HELM_REGISTRY_CONFIG":   s.RegistryConfig,
-		"HELM_REPOSITORY_CACHE":  s.RepositoryCache,
-		"HELM_REPOSITORY_CONFIG": s.RepositoryConfig,
-		"HELM_NAMESPACE":         s.Namespace(),
-		"HELM_MAX_HISTORY":       strconv.Itoa(s.MaxHistory),
-		"HELM_BURST_LIMIT":       strconv.Itoa(s.BurstLimit),
+		"HELM_BIN":                   os.Args[0],
+		"HELM_CACHE_HOME":            helmpath.CachePath(""),
+		"HELM_CONFIG_HOME":           helmpath.ConfigPath(""),
+		"HELM_DATA_HOME":             helmpath.DataPath(""),
+		"HELM_DEBUG":                 fmt.Sprint(s.Debug),
+		"HELM_PLUGINS":               s.PluginsDirectory,
+		"HELM_REGISTRY_CONFIG":       s.RegistryConfig,
+		"HELM_REGISTRY_ALIAS_CONFIG": s.RegistryAliasConfig,
+		"HELM_REPOSITORY_CACHE":      s.RepositoryCache,
+		"HELM_REPOSITORY_CONFIG":     s.RepositoryConfig,
+		"HELM_NAMESPACE":             s.Namespace(),
+		"HELM_MAX_HISTORY":           strconv.Itoa(s.MaxHistory),
+		"HELM_BURST_LIMIT":           strconv.Itoa(s.BurstLimit),
 
 		// broken, these are populated from helm flags and not kubeconfig.
 		"HELM_KUBECONTEXT":                  s.KubeContext,
