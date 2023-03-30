@@ -37,9 +37,10 @@ import (
 )
 
 type waiter struct {
-	c       ReadyChecker
-	timeout time.Duration
-	log     func(string, ...interface{})
+	c       						ReadyChecker
+	timeout 						time.Duration
+	perResourceTimeout 	time.Duration
+	log     						func(string, ...interface{})
 }
 
 // waitForResources polls to get the current status of all pods, PVCs, Services and
@@ -50,7 +51,12 @@ func (w *waiter) waitForResources(created ResourceList) error {
 	ctx, cancel := context.WithTimeout(context.Background(), w.timeout)
 	defer cancel()
 
-	return wait.PollImmediateUntil(2*time.Second, func() (bool, error) {
+	timeout := 2 * time.Second
+	if w.perResourceTimeout > timeout {
+		timeout = w.perResourceTimeout
+	}
+
+	return wait.PollImmediateUntil(timeout, func() (bool, error) {
 		for _, v := range created {
 			ready, err := w.c.IsReady(ctx, v)
 			if !ready || err != nil {
