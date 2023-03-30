@@ -368,7 +368,7 @@ func (i *Install) RunWithContext(ctx context.Context, chrt *chart.Chart, vals ma
 		// not working.
 		return rel, err
 	}
-	rChan := make(chan resultMessage)
+	rChan := make(chan resultMessage, 2)
 	doneChan := make(chan struct{})
 	defer close(doneChan)
 	go i.performInstall(rChan, rel, toBeAdopted, resources)
