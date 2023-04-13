@@ -281,3 +281,11 @@ func TestGetVersionSet(t *testing.T) {
 		t.Error("Non-existent version is reported found.")
 	}
 }
+
+func withSecondHook(hookManifest string) chartOption {
+	return func(opts *chartOptions) {
+		opts.Templates = append(opts.Templates,
+			&chart.File{Name: "templates/hooks-test", Data: []byte(hookManifest)},
+		)
+	}
+}
