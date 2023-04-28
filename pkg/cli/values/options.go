@@ -20,6 +20,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -29,22 +30,42 @@ import (
 	"helm.sh/helm/v3/pkg/strvals"
 )
 
+const yamlExt = `.yaml`
+
 // Options captures the different ways to specify values
 type Options struct {
-	ValueFiles   []string // -f/--values
-	StringValues []string // --set-string
-	Values       []string // --set
-	FileValues   []string // --set-file
-	JSONValues   []string // --set-json
+	ValueFiles        []string // -f/--values
+	ValuesDirectories []string // -d/--values-directory
+	StringValues      []string // --set-string
+	Values            []string // --set
+	FileValues        []string // --set-file
+	JSONValues        []string // --set-json
 }
 
-// MergeValues merges values from files specified via -f/--values and directly
-// via --set-json, --set, --set-string, or --set-file, marshaling them to YAML
+// MergeValues merges values from files specified via -f/--values, files in directories
+// specified by -d/--values-directory and directly via --set-json, --set, --set-string,
+// or --set-file, marshaling them to YAML
 func (opts *Options) MergeValues(p getter.Providers) (map[string]interface{}, error) {
 	base := map[string]interface{}{}
 
-	// User specified a values files via -f/--values
-	for _, filePath := range opts.ValueFiles {
+	var valuesFiles []string
+
+	// User specified values directories via -d/--values-directory
+	for _, dir := range opts.ValuesDirectories {
+		// Recursive list of YAML files in input values directory
+		files, err := recursiveListOfFiles(dir, yamlExt)
+		if err != nil {
+			// Error already wrapped
+			return nil, err
+		}
+
+		valuesFiles = append(valuesFiles, files...)
+	}
+
+	// User specified values files via -f/--values
+	valuesFiles = append(valuesFiles, opts.ValueFiles...)
+
+	for _, filePath := range valuesFiles {
 		currentMap := map[string]interface{}{}
 
 		bytes, err := readFile(filePath, p)
@@ -136,4 +157,41 @@ func readFile(filePath string, p getter.Providers) ([]byte, error) {
 		return nil, err
 	}
 	return data.Bytes(), err
+}
+
+// recursiveListOfFiles returns the list of filenames in input directory
+// recursively in the format: [<dir>/<filename>, ..., <dir>/<sub-dir>/<filename> ...]
+//
+// File extension prepended with dot is required as input. Eg.: .yaml, .json, etc.
+// If input file extension is empty, all files are returned. i.e., no filtering.
+func recursiveListOfFiles(dir, ext string) ([]string, error) {
+	var filenames []string
+
+	err := filepath.Walk(dir,
+		func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return errors.Wrapf(err, "failed to read file %s 's info", path)
+			}
+
+			// Filter files based on input extension
+			if ext != "" {
+				// When input file extension in not empty. i.e., list should be filtered.
+
+				if filepath.Ext(path) != ext {
+					// When file extension doesn't match input
+					return nil
+				}
+			}
+
+			// When file extension in input is empty.
+			// When file extension is not empty and file extension matches input
+			filenames = append(filenames, path)
+
+			return nil
+		})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to recursively list files in directory %s", dir)
+	}
+
+	return filenames, nil
 }

@@ -1,0 +1,4 @@
+backendStack:
+  - Go
+  - Helm
+appName: test-app-be
