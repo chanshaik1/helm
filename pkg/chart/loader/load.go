@@ -18,12 +18,14 @@ package loader
 
 import (
 	"bytes"
+	 "errors"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/pkg/errors"
+	githubErrors "github.com/pkg/errors"
 	"sigs.k8s.io/yaml"
 
 	"helm.sh/helm/v3/pkg/chart"
@@ -82,7 +84,7 @@ func LoadFiles(files []*BufferedFile) (*chart.Chart, error) {
 				c.Metadata = new(chart.Metadata)
 			}
 			if err := yaml.Unmarshal(f.Data, c.Metadata); err != nil {
-				return c, errors.Wrap(err, "cannot load Chart.yaml")
+				return c, githubErrors.Wrap(err, "cannot load Chart.yaml")
 			}
 			// NOTE(bacongobbler): while the chart specification says that APIVersion must be set,
 			// Helm 2 accepted charts that did not provide an APIVersion in their chart metadata.
@@ -100,12 +102,12 @@ func LoadFiles(files []*BufferedFile) (*chart.Chart, error) {
 		case f.Name == "Chart.lock":
 			c.Lock = new(chart.Lock)
 			if err := yaml.Unmarshal(f.Data, &c.Lock); err != nil {
-				return c, errors.Wrap(err, "cannot load Chart.lock")
+				return c, githubErrors.Wrap(err, "cannot load Chart.lock")
 			}
 		case f.Name == "values.yaml":
 			c.Values = make(map[string]interface{})
 			if err := yaml.Unmarshal(f.Data, &c.Values); err != nil {
-				return c, errors.Wrap(err, "cannot load values.yaml")
+				return c, githubErrors.Wrap(err, "cannot load values.yaml")
 			}
 		case f.Name == "values.schema.json":
 			c.Schema = f.Data
@@ -120,7 +122,7 @@ func LoadFiles(files []*BufferedFile) (*chart.Chart, error) {
 				log.Printf("Warning: Dependencies are handled in Chart.yaml since apiVersion \"v2\". We recommend migrating dependencies to Chart.yaml.")
 			}
 			if err := yaml.Unmarshal(f.Data, c.Metadata); err != nil {
-				return c, errors.Wrap(err, "cannot load requirements.yaml")
+				return c, githubErrors.Wrap(err, "cannot load requirements.yaml")
 			}
 			if c.Metadata.APIVersion == chart.APIVersionV1 {
 				c.Files = append(c.Files, &chart.File{Name: f.Name, Data: f.Data})
@@ -129,7 +131,7 @@ func LoadFiles(files []*BufferedFile) (*chart.Chart, error) {
 		case f.Name == "requirements.lock":
 			c.Lock = new(chart.Lock)
 			if err := yaml.Unmarshal(f.Data, &c.Lock); err != nil {
-				return c, errors.Wrap(err, "cannot load requirements.lock")
+				return c, githubErrors.Wrap(err, "cannot load requirements.lock")
 			}
 			if c.Metadata == nil {
 				c.Metadata = new(chart.Metadata)
@@ -171,7 +173,7 @@ func LoadFiles(files []*BufferedFile) (*chart.Chart, error) {
 		case filepath.Ext(n) == ".tgz":
 			file := files[0]
 			if file.Name != n {
-				return c, errors.Errorf("error unpacking tar in %s: expected %s, got %s", c.Name(), n, file.Name)
+				return c, fmt.Errorf("error unpacking tar in %s: expected %s, got %s", c.Name(), n, file.Name)
 			}
 			// Untar the chart and add to c.Dependencies
 			sc, err = LoadArchive(bytes.NewBuffer(file.Data))
@@ -191,7 +193,7 @@ func LoadFiles(files []*BufferedFile) (*chart.Chart, error) {
 		}
 
 		if err != nil {
-			return c, errors.Wrapf(err, "error unpacking %s in %s", n, c.Name())
+			return c, githubErrors.Wrapf(err, "error unpacking %s in %s", n, c.Name())
 		}
 		c.AddDependency(sc)
 	}

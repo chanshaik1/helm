@@ -23,8 +23,9 @@ import (
 	"path"
 	"strings"
 	"time"
+	"errors"
 
-	"github.com/pkg/errors"
+	githubErrors "github.com/pkg/errors"
 
 	"helm.sh/helm/v3/internal/tlsutil"
 	"helm.sh/helm/v3/pkg/chart/loader"
@@ -48,7 +49,7 @@ func (pusher *OCIPusher) push(chartRef, href string) error {
 	stat, err := os.Stat(chartRef)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return errors.Errorf("%s: no such file", chartRef)
+			return fmt.Errorf("%s: no such file", chartRef)
 		}
 		return err
 	}
@@ -108,7 +109,7 @@ func (pusher *OCIPusher) newRegistryClient() (*registry.Client, error) {
 	if (pusher.opts.certFile != "" && pusher.opts.keyFile != "") || pusher.opts.caFile != "" || pusher.opts.insecureSkipTLSverify {
 		tlsConf, err := tlsutil.NewClientTLS(pusher.opts.certFile, pusher.opts.keyFile, pusher.opts.caFile, pusher.opts.insecureSkipTLSverify)
 		if err != nil {
-			return nil, errors.Wrap(err, "can't create TLS config for client")
+			return nil, githubErrors.Wrap(err, "can't create TLS config for client")
 		}
 
 		registryClient, err := registry.NewClient(

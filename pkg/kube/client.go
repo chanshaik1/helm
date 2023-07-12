@@ -28,9 +28,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"errors"
 
 	jsonpatch "github.com/evanphx/json-patch"
-	"github.com/pkg/errors"
+	githubErrors "github.com/pkg/errors"
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -121,10 +122,10 @@ func (c *Client) IsReachable() error {
 		return errors.New("Kubernetes cluster unreachable")
 	}
 	if err != nil {
-		return errors.Wrap(err, "Kubernetes cluster unreachable")
+		return githubErrors.Wrap(err, "Kubernetes cluster unreachable")
 	}
 	if _, err := client.ServerVersion(); err != nil {
-		return errors.Wrap(err, "Kubernetes cluster unreachable")
+		return githubErrors.Wrap(err, "Kubernetes cluster unreachable")
 	}
 	return nil
 }
@@ -391,7 +392,7 @@ func (c *Client) Update(original, target ResourceList, force bool) (*Result, err
 		helper := resource.NewHelper(info.Client, info.Mapping).WithFieldManager(getManagedFieldsManager())
 		if _, err := helper.Get(info.Namespace, info.Name); err != nil {
 			if !apierrors.IsNotFound(err) {
-				return errors.Wrap(err, "could not get information about the resource")
+				return githubErrors.Wrap(err, "could not get information about the resource")
 			}
 
 			// Append the created resource to the results, even if something fails
@@ -399,7 +400,7 @@ func (c *Client) Update(original, target ResourceList, force bool) (*Result, err
 
 			// Since the resource does not exist, create it.
 			if err := createResource(info); err != nil {
-				return errors.Wrap(err, "failed to create resource")
+				return githubErrors.Wrap(err, "failed to create resource")
 			}
 
 			kind := info.Mapping.GroupVersionKind.Kind
@@ -410,7 +411,7 @@ func (c *Client) Update(original, target ResourceList, force bool) (*Result, err
 		originalInfo := original.Get(info)
 		if originalInfo == nil {
 			kind := info.Mapping.GroupVersionKind.Kind
-			return errors.Errorf("no %s with the name %q found", kind, info.Name)
+			return fmt.Errorf("no %s with the name %q found", kind, info.Name)
 		}
 
 		if err := updateResource(c, info, originalInfo.Object, force); err != nil {
@@ -427,7 +428,7 @@ func (c *Client) Update(original, target ResourceList, force bool) (*Result, err
 	case err != nil:
 		return res, err
 	case len(updateErrors) != 0:
-		return res, errors.Errorf(strings.Join(updateErrors, " && "))
+		return res, fmt.Errorf(strings.Join(updateErrors, " && "))
 	}
 
 	for _, info := range original.Difference(target) {
@@ -606,24 +607,24 @@ func deleteResource(info *resource.Info, policy metav1.DeletionPropagation) erro
 func createPatch(target *resource.Info, current runtime.Object) ([]byte, types.PatchType, error) {
 	oldData, err := json.Marshal(current)
 	if err != nil {
-		return nil, types.StrategicMergePatchType, errors.Wrap(err, "serializing current configuration")
+		return nil, types.StrategicMergePatchType, githubErrors.Wrap(err, "serializing current configuration")
 	}
 	newData, err := json.Marshal(target.Object)
 	if err != nil {
-		return nil, types.StrategicMergePatchType, errors.Wrap(err, "serializing target configuration")
+		return nil, types.StrategicMergePatchType, githubErrors.Wrap(err, "serializing target configuration")
 	}
 
 	// Fetch the current object for the three way merge
 	helper := resource.NewHelper(target.Client, target.Mapping).WithFieldManager(getManagedFieldsManager())
 	currentObj, err := helper.Get(target.Namespace, target.Name)
 	if err != nil && !apierrors.IsNotFound(err) {
-		return nil, types.StrategicMergePatchType, errors.Wrapf(err, "unable to get data for current object %s/%s", target.Namespace, target.Name)
+		return nil, types.StrategicMergePatchType, githubErrors.Wrapf(err, "unable to get data for current object %s/%s", target.Namespace, target.Name)
 	}
 
 	// Even if currentObj is nil (because it was not found), it will marshal just fine
 	currentData, err := json.Marshal(currentObj)
 	if err != nil {
-		return nil, types.StrategicMergePatchType, errors.Wrap(err, "serializing live configuration")
+		return nil, types.StrategicMergePatchType, githubErrors.Wrap(err, "serializing live configuration")
 	}
 
 	// Get a versioned object
@@ -646,7 +647,7 @@ func createPatch(target *resource.Info, current runtime.Object) ([]byte, types.P
 
 	patchMeta, err := strategicpatch.NewPatchMetaFromStruct(versionedObject)
 	if err != nil {
-		return nil, types.StrategicMergePatchType, errors.Wrap(err, "unable to create patch metadata from object")
+		return nil, types.StrategicMergePatchType, githubErrors.Wrap(err, "unable to create patch metadata from object")
 	}
 
 	patch, err := strategicpatch.CreateThreeWayMergePatch(oldData, newData, currentData, patchMeta, true)
@@ -665,13 +666,13 @@ func updateResource(c *Client, target *resource.Info, currentObj runtime.Object,
 		var err error
 		obj, err = helper.Replace(target.Namespace, target.Name, true, target.Object)
 		if err != nil {
-			return errors.Wrap(err, "failed to replace object")
+			return githubErrors.Wrap(err, "failed to replace object")
 		}
 		c.Log("Replaced %q with kind %s for kind %s", target.Name, currentObj.GetObjectKind().GroupVersionKind().Kind, kind)
 	} else {
 		patch, patchType, err := createPatch(target, currentObj)
 		if err != nil {
-			return errors.Wrap(err, "failed to create patch")
+			return githubErrors.Wrap(err, "failed to create patch")
 		}
 
 		if patch == nil || string(patch) == "{}" {
@@ -679,7 +680,7 @@ func updateResource(c *Client, target *resource.Info, currentObj runtime.Object,
 			// This needs to happen to make sure that Helm has the latest info from the API
 			// Otherwise there will be no labels and other functions that use labels will panic
 			if err := target.Get(); err != nil {
-				return errors.Wrap(err, "failed to refresh resource information")
+				return githubErrors.Wrap(err, "failed to refresh resource information")
 			}
 			return nil
 		}
@@ -687,7 +688,7 @@ func updateResource(c *Client, target *resource.Info, currentObj runtime.Object,
 		c.Log("Patch %s %q in namespace %s", kind, target.Name, target.Namespace)
 		obj, err = helper.Patch(target.Namespace, target.Name, patchType, patch, nil)
 		if err != nil {
-			return errors.Wrapf(err, "cannot patch %q with kind %s", target.Name, kind)
+			return githubErrors.Wrapf(err, "cannot patch %q with kind %s", target.Name, kind)
 		}
 	}
 
@@ -745,7 +746,7 @@ func (c *Client) watchUntilReady(timeout time.Duration, info *resource.Info) err
 		case watch.Error:
 			// Handle error and return with an error.
 			c.Log("Error event for %s", info.Name)
-			return true, errors.Errorf("failed to deploy %s", info.Name)
+			return true, fmt.Errorf("failed to deploy %s", info.Name)
 		default:
 			return false, nil
 		}
@@ -759,14 +760,14 @@ func (c *Client) watchUntilReady(timeout time.Duration, info *resource.Info) err
 func (c *Client) waitForJob(obj runtime.Object, name string) (bool, error) {
 	o, ok := obj.(*batch.Job)
 	if !ok {
-		return true, errors.Errorf("expected %s to be a *batch.Job, got %T", name, obj)
+		return true, fmt.Errorf("expected %s to be a *batch.Job, got %T", name, obj)
 	}
 
 	for _, c := range o.Status.Conditions {
 		if c.Type == batch.JobComplete && c.Status == "True" {
 			return true, nil
 		} else if c.Type == batch.JobFailed && c.Status == "True" {
-			return true, errors.Errorf("job failed: %s", c.Reason)
+			return true, fmt.Errorf("job failed: %s", c.Reason)
 		}
 	}
 
@@ -780,7 +781,7 @@ func (c *Client) waitForJob(obj runtime.Object, name string) (bool, error) {
 func (c *Client) waitForPodSuccess(obj runtime.Object, name string) (bool, error) {
 	o, ok := obj.(*v1.Pod)
 	if !ok {
-		return true, errors.Errorf("expected %s to be a *v1.Pod, got %T", name, obj)
+		return true, fmt.Errorf("expected %s to be a *v1.Pod, got %T", name, obj)
 	}
 
 	switch o.Status.Phase {
@@ -788,7 +789,7 @@ func (c *Client) waitForPodSuccess(obj runtime.Object, name string) (bool, error
 		c.Log("Pod %s succeeded", o.Name)
 		return true, nil
 	case v1.PodFailed:
-		return true, errors.Errorf("pod %s failed", o.Name)
+		return true, fmt.Errorf("pod %s failed", o.Name)
 	case v1.PodPending:
 		c.Log("Pod %s pending", o.Name)
 	case v1.PodRunning:
