@@ -29,6 +29,8 @@ import (
 	"helm.sh/helm/v3/pkg/helmpath"
 )
 
+const expectedNumberOfTemplates = 10
+
 func TestCreateCmd(t *testing.T) {
 	defer ensure.HelmHome(t)()
 	cname := "testchart"
@@ -105,7 +107,6 @@ func TestCreateStarterCmd(t *testing.T) {
 		t.Errorf("Wrong API version: %q", c.Metadata.APIVersion)
 	}
 
-	expectedNumberOfTemplates := 9
 	if l := len(c.Templates); l != expectedNumberOfTemplates {
 		t.Errorf("Expected %d templates, got %d", expectedNumberOfTemplates, l)
 	}
@@ -173,7 +174,6 @@ func TestCreateStarterAbsoluteCmd(t *testing.T) {
 		t.Errorf("Wrong API version: %q", c.Metadata.APIVersion)
 	}
 
-	expectedNumberOfTemplates := 9
 	if l := len(c.Templates); l != expectedNumberOfTemplates {
 		t.Errorf("Expected %d templates, got %d", expectedNumberOfTemplates, l)
 	}
