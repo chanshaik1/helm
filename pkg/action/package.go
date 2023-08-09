@@ -19,13 +19,12 @@ package action
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"syscall"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/chartutil"
@@ -137,7 +136,7 @@ func (p *Package) Clearsign(filename string) error {
 		return err
 	}
 
-	return ioutil.WriteFile(filename+".prov", []byte(sig), 0644)
+	return os.WriteFile(filename+".prov", []byte(sig), 0644)
 }
 
 // promptUser implements provenance.PassphraseFetcher
@@ -145,7 +144,7 @@ func promptUser(name string) ([]byte, error) {
 	fmt.Printf("Password for key %q >  ", name)
 	// syscall.Stdin is not an int in all environments and needs to be coerced
 	// into one there (e.g., Windows)
-	pw, err := terminal.ReadPassword(int(syscall.Stdin))
+	pw, err := term.ReadPassword(int(syscall.Stdin))
 	fmt.Println()
 	return pw, err
 }

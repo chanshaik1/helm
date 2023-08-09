@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -72,6 +72,34 @@ func TestValidate(t *testing.T) {
 			},
 			ValidationError("dependency \"bad\" has disallowed characters in the alias"),
 		},
+		{
+			&Metadata{
+				Name:       "test",
+				APIVersion: "v2",
+				Version:    "1.0",
+				Type:       "application",
+				Dependencies: []*Dependency{
+					nil,
+				},
+			},
+			ValidationError("dependencies must not contain empty or null nodes"),
+		},
+		{
+			&Metadata{
+				Name:       "test",
+				APIVersion: "v2",
+				Version:    "1.0",
+				Type:       "application",
+				Maintainers: []*Maintainer{
+					nil,
+				},
+			},
+			ValidationError("maintainers must not contain empty or null nodes"),
+		},
+		{
+			&Metadata{APIVersion: "v2", Name: "test", Version: "1.2.3.4"},
+			ValidationError("chart.metadata.version \"1.2.3.4\" is invalid"),
+		},
 	}
 
 	for _, tt := range tests {
@@ -82,26 +110,15 @@ func TestValidate(t *testing.T) {
 	}
 }
 
-func TestValidateDependency(t *testing.T) {
-	dep := &Dependency{
-		Name: "example",
+func TestValidate_sanitize(t *testing.T) {
+	md := &Metadata{APIVersion: "v2", Name: "test", Version: "1.0", Description: "\adescr\u0081iption\rtest", Maintainers: []*Maintainer{{Name: "\r"}}}
+	if err := md.Validate(); err != nil {
+		t.Fatalf("unexpected error: %s", err)
 	}
-	for value, shouldFail := range map[string]bool{
-		"abcdefghijklmenopQRSTUVWXYZ-0123456780_": false,
-		"-okay":      false,
-		"_okay":      false,
-		"- bad":      true,
-		" bad":       true,
-		"bad\nvalue": true,
-		"bad ":       true,
-		"bad$":       true,
-	} {
-		dep.Alias = value
-		res := validateDependency(dep)
-		if res != nil && !shouldFail {
-			t.Errorf("Failed on case %q", dep.Alias)
-		} else if res == nil && shouldFail {
-			t.Errorf("Expected failure for %q", dep.Alias)
-		}
+	if md.Description != "description test" {
+		t.Fatalf("description was not sanitized: %q", md.Description)
+	}
+	if md.Maintainers[0].Name != " " {
+		t.Fatal("maintainer name was not sanitized")
 	}
 }

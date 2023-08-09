@@ -17,12 +17,12 @@ package plugin // import "helm.sh/helm/v3/pkg/plugin"
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
+	"unicode"
 
 	"github.com/pkg/errors"
 	"sigs.k8s.io/yaml"
@@ -151,7 +151,7 @@ func (p *Plugin) PrepareCommand(extraArgs []string) (string, []string, error) {
 		parts = strings.Split(os.ExpandEnv(p.Metadata.Command), " ")
 	}
 	if len(parts) == 0 || parts[0] == "" {
-		return "", nil, fmt.Errorf("No plugin command is applicable")
+		return "", nil, fmt.Errorf("no plugin command is applicable")
 	}
 
 	main := parts[0]
@@ -175,8 +175,23 @@ func validatePluginData(plug *Plugin, filepath string) error {
 	if !validPluginName.MatchString(plug.Metadata.Name) {
 		return fmt.Errorf("invalid plugin name at %q", filepath)
 	}
+	plug.Metadata.Usage = sanitizeString(plug.Metadata.Usage)
+
 	// We could also validate SemVer, executable, and other fields should we so choose.
 	return nil
+}
+
+// sanitizeString normalize spaces and removes non-printable characters.
+func sanitizeString(str string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return ' '
+		}
+		if unicode.IsPrint(r) {
+			return r
+		}
+		return -1
+	}, str)
 }
 
 func detectDuplicates(plugs []*Plugin) error {
@@ -200,7 +215,7 @@ func detectDuplicates(plugs []*Plugin) error {
 // LoadDir loads a plugin from the given directory.
 func LoadDir(dirname string) (*Plugin, error) {
 	pluginfile := filepath.Join(dirname, PluginFileName)
-	data, err := ioutil.ReadFile(pluginfile)
+	data, err := os.ReadFile(pluginfile)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to read plugin at %q", pluginfile)
 	}
