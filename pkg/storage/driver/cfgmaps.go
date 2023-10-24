@@ -45,6 +45,10 @@ type ConfigMaps struct {
 	Log  func(string, ...interface{})
 }
 
+func (cfgmaps *ConfigMaps) CanPushDownLabelSelector() bool {
+	return true
+}
+
 // NewConfigMaps initializes a new ConfigMaps wrapping an implementation of
 // the kubernetes ConfigMapsInterface.
 func NewConfigMaps(impl corev1.ConfigMapInterface) *ConfigMaps {
@@ -83,12 +87,8 @@ func (cfgmaps *ConfigMaps) Get(key string) (*rspb.Release, error) {
 	return r, nil
 }
 
-// List fetches all releases and returns the list releases such
-// that filter(release) == true. An error is returned if the
-// configmap fails to retrieve the releases.
-func (cfgmaps *ConfigMaps) List(filter func(*rspb.Release) bool) ([]*rspb.Release, error) {
-	lsel := kblabels.Set{"owner": "helm"}.AsSelector()
-	opts := metav1.ListOptions{LabelSelector: lsel.String()}
+func (cfgmaps *ConfigMaps) listInternal(filter func(*rspb.Release) bool, selector string) ([]*rspb.Release, error) {
+	opts := metav1.ListOptions{LabelSelector: selector}
 
 	list, err := cfgmaps.impl.List(context.Background(), opts)
 	if err != nil {
@@ -114,6 +114,23 @@ func (cfgmaps *ConfigMaps) List(filter func(*rspb.Release) bool) ([]*rspb.Releas
 		}
 	}
 	return results, nil
+}
+
+func (cfgmaps *ConfigMaps) ListWithSelector(filter func(*rspb.Release) bool, selector string) ([]*rspb.Release, error) {
+	lsel := kblabels.Set{"owner": "helm"}.AsSelector()
+	labelSelector := lsel.String()
+	if selector != "" {
+		labelSelector += "," + selector
+	}
+	return cfgmaps.listInternal(filter, labelSelector)
+}
+
+// List fetches all releases and returns the list releases such
+// that filter(release) == true. An error is returned if the
+// configmap fails to retrieve the releases.
+func (cfgmaps *ConfigMaps) List(filter func(*rspb.Release) bool) ([]*rspb.Release, error) {
+	lsel := kblabels.Set{"owner": "helm"}.AsSelector()
+	return cfgmaps.listInternal(filter, lsel.String())
 }
 
 // Query fetches all releases that match the provided map of labels.

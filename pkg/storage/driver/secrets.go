@@ -45,6 +45,10 @@ type Secrets struct {
 	Log  func(string, ...interface{})
 }
 
+func (secrets *Secrets) CanPushDownLabelSelector() bool {
+	return true
+}
+
 // NewSecrets initializes a new Secrets wrapping an implementation of
 // the kubernetes SecretsInterface.
 func NewSecrets(impl corev1.SecretInterface) *Secrets {
@@ -76,13 +80,25 @@ func (secrets *Secrets) Get(key string) (*rspb.Release, error) {
 	return r, errors.Wrapf(err, "get: failed to decode data %q", key)
 }
 
+func (secrets *Secrets) ListWithSelector(filter func(*rspb.Release) bool, selector string) ([]*rspb.Release, error) {
+	lsel := kblabels.Set{"owner": "helm"}.AsSelector()
+	labelSelector := lsel.String()
+	if selector != "" {
+		labelSelector += "," + selector
+	}
+	return secrets.listInternal(filter, labelSelector)
+}
+
 // List fetches all releases and returns the list releases such
 // that filter(release) == true. An error is returned if the
 // secret fails to retrieve the releases.
 func (secrets *Secrets) List(filter func(*rspb.Release) bool) ([]*rspb.Release, error) {
 	lsel := kblabels.Set{"owner": "helm"}.AsSelector()
-	opts := metav1.ListOptions{LabelSelector: lsel.String()}
+	return secrets.listInternal(filter, lsel.String())
+}
 
+func (secrets *Secrets) listInternal(filter func(*rspb.Release) bool, selector string) ([]*rspb.Release, error) {
+	opts := metav1.ListOptions{LabelSelector: selector}
 	list, err := secrets.impl.List(context.Background(), opts)
 	if err != nil {
 		return nil, errors.Wrap(err, "list: failed to list")
