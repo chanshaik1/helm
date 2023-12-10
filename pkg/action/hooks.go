@@ -17,7 +17,6 @@ package action
 
 import (
 	"bytes"
-	"sort"
 	"time"
 
 	"github.com/pkg/errors"
@@ -37,9 +36,6 @@ func (cfg *Configuration) execHook(rl *release.Release, hook release.HookEvent, 
 			}
 		}
 	}
-
-	// hooke are pre-ordered by kind, so keep order stable
-	sort.Stable(hookByWeight(executingHooks))
 
 	for _, h := range executingHooks {
 		// Set default delete policy to before-hook-creation
@@ -105,18 +101,6 @@ func (cfg *Configuration) execHook(rl *release.Release, hook release.HookEvent, 
 	}
 
 	return nil
-}
-
-// hookByWeight is a sorter for hooks
-type hookByWeight []*release.Hook
-
-func (x hookByWeight) Len() int      { return len(x) }
-func (x hookByWeight) Swap(i, j int) { x[i], x[j] = x[j], x[i] }
-func (x hookByWeight) Less(i, j int) bool {
-	if x[i].Weight == x[j].Weight {
-		return x[i].Name < x[j].Name
-	}
-	return x[i].Weight < x[j].Weight
 }
 
 // deleteHookByPolicy deletes a hook if the hook policy instructs it to
