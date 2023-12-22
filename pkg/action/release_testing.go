@@ -54,8 +54,7 @@ func NewReleaseTesting(cfg *Configuration) *ReleaseTesting {
 	}
 }
 
-// Run executes 'helm test' against the given release.
-func (r *ReleaseTesting) Run(name string) (*release.Release, error) {
+func (r *ReleaseTesting) RunWithContext(ctx context.Context, name string) (*release.Release, error) {
 	if err := r.cfg.KubeClient.IsReachable(); err != nil {
 		return nil, err
 	}
@@ -94,7 +93,7 @@ func (r *ReleaseTesting) Run(name string) (*release.Release, error) {
 		rel.Hooks = executingHooks
 	}
 
-	if err := r.cfg.execHook(rel, release.HookTest, r.Timeout); err != nil {
+	if err := r.cfg.execHook(r.Timeout, rel, release.HookTest); err != nil {
 		rel.Hooks = append(skippedHooks, rel.Hooks...)
 		r.cfg.Releases.Update(rel)
 		return rel, err
@@ -102,6 +101,11 @@ func (r *ReleaseTesting) Run(name string) (*release.Release, error) {
 
 	rel.Hooks = append(skippedHooks, rel.Hooks...)
 	return rel, r.cfg.Releases.Update(rel)
+}
+
+// Run executes 'helm test' against the given release.
+func (r *ReleaseTesting) Run(name string) (*release.Release, error) {
+	return r.RunWithContext(context.TODO(), name)
 }
 
 // GetPodLogs will write the logs for all test pods in the given release into

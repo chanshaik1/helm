@@ -17,6 +17,7 @@ limitations under the License.
 package kube
 
 import (
+	"context"
 	"io"
 	"time"
 
@@ -72,6 +73,31 @@ type Interface interface {
 	IsReachable() error
 }
 
+// ContextInterface is introduced to avoid breaking backwards compatability for Interface implementers.
+//
+// TODO Helm 4: Replace Interface methods that accept a time.Duration as an argument, with a context.
+type ContextInterface interface {
+	// WaitWithContext waits till a ctx timeout for the specified resources to be ready.
+	WaitWithContext(ctx context.Context, resources ResourceList) error
+	// WaitWithJobsContext waits till a ctx timeout for the specified resources to be ready, including jobs.
+	WaitWithJobsContext(ctx context.Context, resources ResourceList) error
+	// WatchUntilReadyWithContext watches the resources given and waits until it is ready.
+	//
+	// This method is mainly for hook implementations. It watches for a resource to
+	// hit a particular milestone. The milestone depends on the Kind.
+	//
+	// For Jobs, "ready" means the Job ran to completion (exited without error).
+	// For Pods, "ready" means the Pod phase is marked "succeeded".
+	// For all other kinds, it means the kind was created or modified without
+	// error.
+	WatchUntilReadyWithContext(context.Context, ResourceList) error
+	// WaitAndGetCompletedPodPhaseWithContext waits up to a timeout until a pod enters a completed phase
+	// and returns said phase (PodSucceeded or PodFailed qualify).
+	WaitAndGetCompletedPodPhaseWithContext(context.Context, string) (v1.PodPhase, error)
+	// WaitForDeleteWithContext waits till a ctx timeout for the specified resources to be deleted.
+	WaitForDeleteWithContext(context.Context, ResourceList) error
+}
+
 // InterfaceExt is introduced to avoid breaking backwards compatibility for Interface implementers.
 //
 // TODO Helm 4: Remove InterfaceExt and integrate its method(s) into the Interface.
@@ -112,5 +138,6 @@ type InterfaceResources interface {
 
 var _ Interface = (*Client)(nil)
 var _ InterfaceExt = (*Client)(nil)
+var _ ContextInterface = (*Client)(nil)
 var _ InterfaceDeletionPropagation = (*Client)(nil)
 var _ InterfaceResources = (*Client)(nil)

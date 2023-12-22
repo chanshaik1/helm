@@ -17,6 +17,7 @@ limitations under the License.
 package action
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -56,6 +57,13 @@ func NewUninstall(cfg *Configuration) *Uninstall {
 
 // Run uninstalls the given release.
 func (u *Uninstall) Run(name string) (*release.UninstallReleaseResponse, error) {
+	ctx, cancel := context.WithTimeout(context.TODO(), u.Timeout)
+	defer cancel()
+
+	return u.RunWithContext(ctx, name)
+}
+
+func (u *Uninstall) RunWithContext(ctx context.Context, name string) (*release.UninstallReleaseResponse, error) {
 	if err := u.cfg.KubeClient.IsReachable(); err != nil {
 		return nil, err
 	}
@@ -106,7 +114,7 @@ func (u *Uninstall) Run(name string) (*release.UninstallReleaseResponse, error) 
 	res := &release.UninstallReleaseResponse{Release: rel}
 
 	if !u.DisableHooks {
-		if err := u.cfg.execHook(rel, release.HookPreDelete, u.Timeout); err != nil {
+		if err := u.cfg.execHook(u.Timeout, rel, release.HookPreDelete); err != nil {
 			return res, err
 		}
 	} else {
@@ -131,15 +139,25 @@ func (u *Uninstall) Run(name string) (*release.UninstallReleaseResponse, error) 
 	res.Info = kept
 
 	if u.Wait {
-		if kubeClient, ok := u.cfg.KubeClient.(kube.InterfaceExt); ok {
-			if err := kubeClient.WaitForDelete(deletedResources, u.Timeout); err != nil {
-				errs = append(errs, err)
-			}
+		var err error
+		// Helm 4 TODO: WaitForDelete should be replaced with it's context
+		// aware counterpart.
+		switch kubeClient := u.cfg.KubeClient.(type) {
+		case kube.ContextInterface:
+			err = kubeClient.WaitForDeleteWithContext(ctx, deletedResources)
+		case kube.InterfaceExt:
+			err = kubeClient.WaitForDelete(deletedResources, u.Timeout)
+		default:
+			u.cfg.Log("WARNING: KubeClient does not satisfy ContextInterface, or InterfaceExt")
+		}
+
+		if err != nil {
+			errs = append(errs, err)
 		}
 	}
 
 	if !u.DisableHooks {
-		if err := u.cfg.execHook(rel, release.HookPostDelete, u.Timeout); err != nil {
+		if err := u.cfg.execHook(u.Timeout, rel, release.HookPostDelete); err != nil {
 			errs = append(errs, err)
 		}
 	}

@@ -17,17 +17,19 @@ package action
 
 import (
 	"bytes"
+	"context"
 	"sort"
 	"time"
 
 	"github.com/pkg/errors"
 
+	"helm.sh/helm/v3/pkg/kube"
 	"helm.sh/helm/v3/pkg/release"
 	helmtime "helm.sh/helm/v3/pkg/time"
 )
 
 // execHook executes all of the hooks for the given hook event.
-func (cfg *Configuration) execHook(rl *release.Release, hook release.HookEvent, timeout time.Duration) error {
+func (cfg *Configuration) execHook(timeout time.Duration, rl *release.Release, hook release.HookEvent) error {
 	executingHooks := []*release.Hook{}
 
 	for _, h := range rl.Hooks {
@@ -79,8 +81,20 @@ func (cfg *Configuration) execHook(rl *release.Release, hook release.HookEvent, 
 			return errors.Wrapf(err, "warning: Hook %s %s failed", hook, h.Path)
 		}
 
-		// Watch hook resources until they have completed
-		err = cfg.KubeClient.WatchUntilReady(resources, timeout)
+		// Check if kube.Interface implementation satisfies kube.ContextInterface interface.
+		// If not, fallback to time based watch to maintain backwards compatibility.
+		if kubeClient, ok := cfg.KubeClient.(kube.ContextInterface); ok {
+			// Helm 4 TODO: WatchUntilReady should be replaced with it's context
+			// aware counterpart.
+			ctx, cancel := context.WithTimeout(context.TODO(), timeout)
+			defer cancel()
+			// Watch hook resources until they have completed
+			err = kubeClient.WatchUntilReadyWithContext(ctx, resources)
+		} else {
+			//
+			err = cfg.KubeClient.WatchUntilReady(resources, timeout)
+		}
+
 		// Note the time of success/failure
 		h.LastRun.CompletedAt = helmtime.Now()
 		// Mark hook as succeeded or failed

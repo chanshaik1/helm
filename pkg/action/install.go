@@ -212,10 +212,8 @@ func (i *Install) installCRDs(crds []chart.CRD) error {
 // Run executes the installation
 //
 // If DryRun is set to true, this will prepare the release, but not install it
-
 func (i *Install) Run(chrt *chart.Chart, vals map[string]interface{}) (*release.Release, error) {
-	ctx := context.Background()
-	return i.RunWithContext(ctx, chrt, vals)
+	return i.RunWithContext(context.TODO(), chrt, vals)
 }
 
 // Run executes the installation with Context
@@ -389,31 +387,12 @@ func (i *Install) RunWithContext(ctx context.Context, chrt *chart.Chart, vals ma
 		return rel, err
 	}
 
-	rel, err = i.performInstallCtx(ctx, rel, toBeAdopted, resources)
+	rel, err = i.performInstall(ctx, rel, toBeAdopted, resources)
 	if err != nil {
 		rel, err = i.failRelease(rel, err)
 	}
+
 	return rel, err
-}
-
-func (i *Install) performInstallCtx(ctx context.Context, rel *release.Release, toBeAdopted kube.ResourceList, resources kube.ResourceList) (*release.Release, error) {
-	type Msg struct {
-		r *release.Release
-		e error
-	}
-	resultChan := make(chan Msg, 1)
-
-	go func() {
-		rel, err := i.performInstall(rel, toBeAdopted, resources)
-		resultChan <- Msg{rel, err}
-	}()
-	select {
-	case <-ctx.Done():
-		err := ctx.Err()
-		return rel, err
-	case msg := <-resultChan:
-		return msg.r, msg.e
-	}
 }
 
 // isDryRun returns true if Upgrade is set to run as a DryRun
@@ -424,12 +403,12 @@ func (i *Install) isDryRun() bool {
 	return false
 }
 
-func (i *Install) performInstall(rel *release.Release, toBeAdopted kube.ResourceList, resources kube.ResourceList) (*release.Release, error) {
+func (i *Install) performInstall(ctx context.Context, rel *release.Release, toBeAdopted, resources kube.ResourceList) (*release.Release, error) {
 	var err error
 	// pre-install hooks
 	if !i.DisableHooks {
-		if err := i.cfg.execHook(rel, release.HookPreInstall, i.Timeout); err != nil {
-			return rel, fmt.Errorf("failed pre-install: %s", err)
+		if err := i.cfg.execHook(i.Timeout, rel, release.HookPreInstall); err != nil {
+			return rel, fmt.Errorf("failed pre-install: %w", err)
 		}
 	}
 
@@ -442,23 +421,37 @@ func (i *Install) performInstall(rel *release.Release, toBeAdopted kube.Resource
 		_, err = i.cfg.KubeClient.Update(toBeAdopted, resources, i.Force)
 	}
 	if err != nil {
-		return rel, err
+		return nil, err
 	}
 
 	if i.Wait {
-		if i.WaitForJobs {
+		var err error
+
+		ctx, cancel := context.WithTimeout(ctx, i.Timeout)
+		defer cancel()
+
+		kubeClient, ok := i.cfg.KubeClient.(kube.ContextInterface)
+		// Helm 4 TODO: WaitWithJobs and Wait should be replaced with their context
+		// aware counterparts.
+		switch {
+		case ok && i.WaitForJobs:
+			err = kubeClient.WaitWithJobsContext(ctx, resources)
+		case ok && !i.WaitForJobs:
+			err = kubeClient.WaitWithContext(ctx, resources)
+		case i.WaitForJobs:
 			err = i.cfg.KubeClient.WaitWithJobs(resources, i.Timeout)
-		} else {
+		case !i.WaitForJobs:
 			err = i.cfg.KubeClient.Wait(resources, i.Timeout)
 		}
+
 		if err != nil {
 			return rel, err
 		}
 	}
 
 	if !i.DisableHooks {
-		if err := i.cfg.execHook(rel, release.HookPostInstall, i.Timeout); err != nil {
-			return rel, fmt.Errorf("failed post-install: %s", err)
+		if err := i.cfg.execHook(i.Timeout, rel, release.HookPostInstall); err != nil {
+			return rel, fmt.Errorf("failed post-install: %w", err)
 		}
 	}
 
@@ -490,7 +483,8 @@ func (i *Install) failRelease(rel *release.Release, err error) (*release.Release
 		uninstall.DisableHooks = i.DisableHooks
 		uninstall.KeepHistory = false
 		uninstall.Timeout = i.Timeout
-		if _, uninstallErr := uninstall.Run(i.ReleaseName); uninstallErr != nil {
+		// Helm 4 TODO: Uninstalling needs to be handled properly on a failed atomic install.
+		if _, uninstallErr := uninstall.RunWithContext(context.TODO(), i.ReleaseName); uninstallErr != nil {
 			return rel, errors.Wrapf(uninstallErr, "an error occurred while uninstalling the release. original install error: %s", err)
 		}
 		return rel, errors.Wrapf(err, "release %s failed, and has been uninstalled due to atomic being set", i.ReleaseName)
