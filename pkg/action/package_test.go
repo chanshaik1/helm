@@ -21,6 +21,8 @@ import (
 	"path"
 	"testing"
 
+	"github.com/pkg/errors"
+
 	"github.com/Masterminds/semver/v3"
 
 	"helm.sh/helm/v3/internal/test/ensure"
@@ -115,6 +117,49 @@ func TestValidateVersion(t *testing.T) {
 					t.Errorf("Expected {%v}, got {%v}", tt.wantErr, err)
 				}
 
+			}
+		})
+	}
+}
+
+func TestValidatePackage(t *testing.T) {
+	tests := []struct {
+		name    string
+		path    string
+		wantErr error
+	}{
+		{
+			"normal package",
+			"testdata/charts/compressedchart-0.1.0.tgz",
+			nil,
+		},
+		{
+			"invalid archived path",
+			"testdata/charts/invalidcompressedchart0.1.0.tgz",
+			errors.New("stat testdata/charts/invalidcompressedchart0.1.0.tgz: no such file or directory"),
+		},
+		{
+			"non-helm created package",
+			"testdata/charts/compressedchart-0.1.0.tar.gz",
+			errors.New("chart must be a tgz file"),
+		},
+		{
+			"path is a folder",
+			"testdata/charts/",
+			errors.New("filename is a folder"),
+		},
+		{
+			"path is a file",
+			"testdata/charts/decompressedchart/Chart.yaml",
+			errors.New("chart must be a tgz file"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := validatePackage(tt.path); err != nil {
+				if err.Error() != tt.wantErr.Error() {
+					t.Errorf("Expected {%v}, got {%v}", tt.wantErr, err)
+				}
 			}
 		})
 	}
