@@ -89,6 +89,7 @@ type Install struct {
 	OutputDir                string
 	Atomic                   bool
 	SkipCRDs                 bool
+	SkipSchemaValidation     bool
 	SubNotes                 bool
 	DisableOpenAPIValidation bool
 	IncludeCRDs              bool
@@ -289,9 +290,18 @@ func (i *Install) RunWithContext(ctx context.Context, chrt *chart.Chart, vals ma
 		IsInstall: !isUpgrade,
 		IsUpgrade: isUpgrade,
 	}
-	valuesToRender, err := chartutil.ToRenderValues(chrt, vals, options, caps)
-	if err != nil {
-		return nil, err
+
+	var valuesToRender chartutil.Values
+	if i.SkipSchemaValidation {
+		valuesToRender, err = chartutil.ToRenderValuesSkipSchemaValidation(chrt, vals, options, caps)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		valuesToRender, err = chartutil.ToRenderValues(chrt, vals, options, caps)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if driver.ContainsSystemLabels(i.Labels) {

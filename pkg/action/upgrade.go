@@ -106,6 +106,8 @@ type Upgrade struct {
 	DisableOpenAPIValidation bool
 	// Get missing dependencies
 	DependencyUpdate bool
+	// Skip JSON schema validation
+	SkipSchemaValidation bool
 	// Lock to control raceconditions when the process receives a SIGTERM
 	Lock sync.Mutex
 	// Enable DNS lookups when rendering templates
@@ -248,9 +250,18 @@ func (u *Upgrade) prepareUpgrade(name string, chart *chart.Chart, vals map[strin
 	if err != nil {
 		return nil, nil, err
 	}
-	valuesToRender, err := chartutil.ToRenderValues(chart, vals, options, caps)
-	if err != nil {
-		return nil, nil, err
+
+	var valuesToRender chartutil.Values
+	if u.SkipSchemaValidation {
+		valuesToRender, err = chartutil.ToRenderValuesSkipSchemaValidation(chart, vals, options, caps)
+		if err != nil {
+			return nil, nil, err
+		}
+	} else {
+		valuesToRender, err = chartutil.ToRenderValues(chart, vals, options, caps)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	// Determine whether or not to interact with remote
