@@ -25,9 +25,8 @@ import (
 	"unicode"
 
 	"github.com/pkg/errors"
-	"sigs.k8s.io/yaml"
-
 	"helm.sh/helm/v3/pkg/cli"
+	"sigs.k8s.io/yaml"
 )
 
 const PluginFileName = "plugin.yaml"
@@ -174,7 +173,13 @@ func (p *Plugin) PrepareCommand(extraArgs []string) (string, []string, error) {
 var validPluginName = regexp.MustCompile("^[A-Za-z0-9_-]+$")
 
 // validatePluginData validates a plugin's YAML data.
+// If the plugin metadata is non-existent(the YAML data does not
+//		exist -> empty plugin YAML file), the plugin cannot be loaded
+// 		because of missing metadata.
 func validatePluginData(plug *Plugin, filepath string) error {
+	if plug.Metadata == nil {
+		return fmt.Errorf("plugin metadata is missing at %q", filepath)
+	}
 	if !validPluginName.MatchString(plug.Metadata.Name) {
 		return fmt.Errorf("invalid plugin name at %q", filepath)
 	}
@@ -227,7 +232,14 @@ func LoadDir(dirname string) (*Plugin, error) {
 	if err := yaml.UnmarshalStrict(data, &plug.Metadata); err != nil {
 		return nil, errors.Wrapf(err, "failed to load plugin at %q", pluginfile)
 	}
-	return plug, validatePluginData(plug, pluginfile)
+	if plug.Metadata == nil {
+		return plug, fmt.Errorf("configuration data missing at %q", pluginfile)
+	}
+	validationError := validatePluginData(plug, pluginfile)
+	if validationError != nil {
+		plug = nil
+	}
+	return plug, validationError
 }
 
 // LoadAll loads all plugins found beneath the base directory.
@@ -249,7 +261,10 @@ func LoadAll(basedir string) ([]*Plugin, error) {
 	for _, yaml := range matches {
 		dir := filepath.Dir(yaml)
 		p, err := LoadDir(dir)
-		if err != nil {
+		if p != nil && err != nil {
+			// Plugin was found but could not be loaded due to missing configuration
+			continue
+		} else if err != nil {
 			return plugins, err
 		}
 		plugins = append(plugins, p)
