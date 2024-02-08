@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/asaskevich/govalidator"
@@ -103,8 +104,13 @@ func validateChartYamlFormat(chartFileError error) error {
 }
 
 func validateChartName(cf *chart.Metadata) error {
+	var validNameRegex = regexp.MustCompile(`^[a-z0-9](([-a-z0-9]*)?)$`)
+
 	if cf.Name == "" {
 		return errors.New("name is required")
+	}
+	if !validNameRegex.MatchString(cf.Name) {
+		return fmt.Errorf("invalid chart name, must match regex %s", validNameRegex.String())
 	}
 	return nil
 }
