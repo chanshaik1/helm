@@ -19,8 +19,10 @@ package action
 import (
 	"path"
 	"regexp"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/releaseutil"
@@ -150,6 +152,16 @@ func (l *List) Run() ([]*release.Release, error) {
 		return nil, err
 	}
 
+	cfg := l.cfg
+	if l.AllNamespaces {
+		// For Empty Namespace the default behavior is to get all namespaces
+		clonedCfg, err := l.cfg.CloneWithNewNamespace("")
+		if err != nil {
+			return nil, err
+		}
+		cfg = clonedCfg
+	}
+
 	var filter *regexp.Regexp
 	if l.Filter != "" {
 		var err error
@@ -159,7 +171,7 @@ func (l *List) Run() ([]*release.Release, error) {
 		}
 	}
 
-	results, err := l.cfg.Releases.List(func(rel *release.Release) bool {
+	results, err := cfg.Releases.List(func(rel *release.Release) bool {
 		// Skip anything that doesn't match the filter.
 		if filter != nil && !filter.MatchString(rel.Name) {
 			return false
@@ -321,4 +333,16 @@ func (l *List) SetStateMask() {
 	}
 
 	l.StateMask = state
+}
+
+// Create a clone of the config with a new namespace
+func (cfg *Configuration) CloneWithNewNamespace(namespace string) (*Configuration, error) {
+	newConf := &Configuration{}
+	newConf.Releases = cfg.Releases
+	getter := cfg.RESTClientGetter.(genericclioptions.RESTClientGetter)
+	helmDriver := strings.ToLower(cfg.Releases.Driver.Name()) //note: Driver.Name() returns capitalized driver names.
+
+	err := newConf.Init(getter, namespace, helmDriver, cfg.Log)
+
+	return newConf, err
 }
