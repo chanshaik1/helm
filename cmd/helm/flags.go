@@ -64,6 +64,7 @@ func addChartPathOptionsFlags(f *pflag.FlagSet, c *action.ChartPathOptions) {
 	f.BoolVar(&c.PlainHTTP, "plain-http", false, "use insecure HTTP connections for the chart download")
 	f.StringVar(&c.CaFile, "ca-file", "", "verify certificates of HTTPS-enabled servers using this CA bundle")
 	f.BoolVar(&c.PassCredentialsAll, "pass-credentials", false, "pass credentials to all domains")
+	f.BoolVar(&c.RemoteRepo, "remote-repo", false, "force use of chart from remote repository instead of local filesystem")
 }
 
 // bindOutputFlag will add the output flag to the given command and bind the
