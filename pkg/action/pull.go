@@ -40,12 +40,13 @@ type Pull struct {
 
 	Settings *cli.EnvSettings // TODO: refactor this out of pkg/action
 
-	Devel       bool
-	Untar       bool
-	VerifyLater bool
-	UntarDir    string
-	DestDir     string
-	cfg         *Configuration
+	Devel        bool
+	Untar        bool
+	VerifyLater  bool
+	UntarDir     string
+	UntarDirName string
+	DestDir      string
+	cfg          *Configuration
 }
 
 type PullOpt func(*Pull)
@@ -152,6 +153,9 @@ func (p *Pull) Run(chartRef string) (string, error) {
 		udCheck := ud
 		if udCheck == "." {
 			_, udCheck = filepath.Split(chartRef)
+			if p.UntarDirName != "" {
+				udCheck = p.UntarDirName
+			}
 		} else {
 			_, chartName := filepath.Split(chartRef)
 			udCheck = filepath.Join(udCheck, chartName)
@@ -166,7 +170,7 @@ func (p *Pull) Run(chartRef string) (string, error) {
 			return out.String(), errors.Errorf("failed to untar: a file or directory with the name %s already exists", udCheck)
 		}
 
-		return out.String(), chartutil.ExpandFile(ud, saved)
+		return out.String(), chartutil.ExpandDir(ud, saved, p.UntarDirName)
 	}
 	return out.String(), nil
 }
