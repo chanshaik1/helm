@@ -71,6 +71,7 @@ type Install struct {
 
 	ClientOnly               bool
 	Force                    bool
+	Force3WayMergePatch      bool
 	CreateNamespace          bool
 	DryRun                   bool
 	DryRunOption             string
@@ -439,7 +440,7 @@ func (i *Install) performInstall(rel *release.Release, toBeAdopted kube.Resource
 	if len(toBeAdopted) == 0 && len(resources) > 0 {
 		_, err = i.cfg.KubeClient.Create(resources)
 	} else if len(resources) > 0 {
-		_, err = i.cfg.KubeClient.Update(toBeAdopted, resources, i.Force)
+		_, err = i.cfg.KubeClient.Update(toBeAdopted, resources, i.Force, i.Force3WayMergePatch)
 	}
 	if err != nil {
 		return rel, err
