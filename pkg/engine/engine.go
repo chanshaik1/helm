@@ -44,6 +44,8 @@ type Engine struct {
 	clientProvider *ClientProvider
 	// EnableDNS tells the engine to allow DNS lookups when rendering templates
 	EnableDNS bool
+	// Log is used for printing logs.
+	Log func(string, ...interface{})
 }
 
 // New creates a new instance of Engine using the passed in rest config.
@@ -240,6 +242,9 @@ func (e Engine) initFunMap(t *template.Template) {
 	// an empty string.
 	if !e.EnableDNS {
 		funcMap["getHostByName"] = func(name string) string {
+			if e.Log != nil {
+				e.Log("DNS lookup is disabled by default. If you understand the security implications, check the documentation for how to enable DNS lookups in templates")
+			}
 			return ""
 		}
 	}
