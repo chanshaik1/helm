@@ -113,12 +113,37 @@ func TestExecRun(t *testing.T) {
 	is := assert.New(t)
 	testpath := setupTestingScript(t)
 
-	renderer, err := NewExec(testpath)
+	renderer, err := NewExec(testpath, false)
 	require.NoError(t, err)
 
 	output, err := renderer.Run(bytes.NewBufferString("FOOTEST"))
 	is.NoError(err)
 	is.Contains(output.String(), "BARTEST")
+}
+
+func TestExecRunIncHooks(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// the actual Run test uses a basic sed example, so skip this test on windows
+		t.Skip("skipping on windows")
+	}
+	is := assert.New(t)
+	testpath := setupTestingScript(t)
+
+	renderer, err := NewExec(testpath, true)
+	require.NoError(t, err)
+
+	input := map[string]string{
+		"templates/FOOTEST.yaml": "Kind: Pod",
+		"templates/baz.yaml":     "Kind: FOOTEST",
+	}
+	expectedOutput := map[string]string{
+		"templates/BARTEST.yaml": "Kind: Pod",
+		"templates/baz.yaml":     "Kind: BARTEST",
+	}
+	output, err := renderer.RunIncHooks(input)
+	is.NoError(err)
+	is.Exactly(expectedOutput, output)
+
 }
 
 func TestNewExecWithOneArgsRun(t *testing.T) {
@@ -129,7 +154,7 @@ func TestNewExecWithOneArgsRun(t *testing.T) {
 	is := assert.New(t)
 	testpath := setupTestingScript(t)
 
-	renderer, err := NewExec(testpath, "ARG1")
+	renderer, err := NewExec(testpath, false, "ARG1")
 	require.NoError(t, err)
 
 	output, err := renderer.Run(bytes.NewBufferString("FOOTEST"))
@@ -145,7 +170,7 @@ func TestNewExecWithTwoArgsRun(t *testing.T) {
 	is := assert.New(t)
 	testpath := setupTestingScript(t)
 
-	renderer, err := NewExec(testpath, "ARG1", "ARG2")
+	renderer, err := NewExec(testpath, false, "ARG1", "ARG2")
 	require.NoError(t, err)
 
 	output, err := renderer.Run(bytes.NewBufferString("FOOTEST"))
